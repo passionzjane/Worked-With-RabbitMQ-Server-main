@@ -1,63 +1,50 @@
 import fs from 'fs';
 import { sendToRabbitMQ } from './RabbitMQ.connet';
-
+import { great_circle_distance } from './great_circle_distance';
 
 
 const FINTECHcoLat = 52.493256;
 const FINTECHCOLon = 13.446082;
 
-function degreeToRadianConverter(deg: number) {
-  return deg * (Math.PI / 180);
+
+const letterChecker = (value: string):boolean => {
+  const regex = /[a-zA-Z]/;
+  return regex.test(value)
 }
-
-const great_circle_distance = (guestLat: number, compLat: number, guestLon: number, compLon: number) => {
-
-      const changeInLat = degreeToRadianConverter(compLat - guestLat)
-      const changeInLong = degreeToRadianConverter(compLon - guestLon)
-  
-  
-      const changeInLatSine = Math.sin(changeInLat/2);
-      const changeInLongSine = Math.sin(changeInLong/2);
-      const param1 = (changeInLatSine** 2) + Math.cos(degreeToRadianConverter(guestLat)) 
-      * Math.cos(degreeToRadianConverter(compLat)) * (changeInLongSine**2);
-      const param2 = 2 * Math.atan2(Math.sqrt(param1), Math.sqrt(1-param1));
-      const distance = 6371 * param2;
-      return distance;
-}
-
-        
 const customerFinder = () => {
   try {
-        fs.readFile('customer.csv', 'utf-8',  async(err, data) => {
+        fs.readFile('customers.txt', 'utf-8',  async(err, data) => {
           if (err) throw err;
+          let customerid: Array<string> = [];
+          const lines: Array<string> = data.split('\n');
           
-          let customerid = [];
-          const lines = data.split('\n');
-          for (let i = 1; i < lines.length; i++) {
-            const columns = lines[i].split(',');
-            if (!columns[2] || !columns[0] || !columns[1]) {
-              console.warn('Invalid record supplied');
+          for (let i = 0; i < lines.length; i ++) {
+            const [id, lat, long] = lines[i].split(',');
+            const splittedId = id.split(': ');
+            const splittedLat = lat.split(': ');
+            const splittedLong = long.split(':');
+
+            if (id === '' || lat === '' || long === '' ||  splittedId[1] === '' || splittedLat[1] === '' || splittedLong[1] === '' ||
+            (letterChecker(splittedLat[1])) || letterChecker(splittedLong[1])) {
+              console.warn(`\nInvalid record encountered !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n`)
               continue;
             }
             
-            const guestLon: number = parseInt(columns[1]);
-            const guestLat: number = parseInt(columns[2]);
-            const returnedDistance: any = great_circle_distance(guestLat, FINTECHcoLat, guestLon, FINTECHCOLon);
-            if (returnedDistance >= 100) {
-              customerid.push(columns[0]);
+            
+            const returnedDistance: any = great_circle_distance(parseFloat(splittedLat[1]), FINTECHcoLat, parseFloat(splittedLong[1]), FINTECHCOLon);
+            if (returnedDistance <= 100) {
+              customerid.push(splittedId[1]);
             }
           }
           
-          customerid = customerid.sort();
-          console.log(customerid)
-          for(let i = 0; i< customerid.length; i++) {
-            sendToRabbitMQ(customerid[i])
+          const sortedCustomerid = customerid.sort();
+          
+          for (let i: number = 0; i < sortedCustomerid.length; i++) {
+            sendToRabbitMQ(customerid[i]);
           }
-          // customerid.forEach((guestId: string) => {
-          //   sendToRabbitMQ(guestId);
-          // })
-      })
-}
+        })
+
+      }
 catch (error: any) {
   console.log(error);
 }

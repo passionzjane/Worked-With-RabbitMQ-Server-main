@@ -1,32 +1,31 @@
-import { Message, Connection, Channel } from 'amqplib';
+import { Message, Connection, Channel, Replies } from 'amqplib';
 import { CONNECT_STRING } from './configuration/configuration';
 const amqp = require('amqplib');
 
 
-async function displayMessage() {
+async function displayMessage(): Promise<void> {
 try {
     const connection: Connection = await amqp.connect(CONNECT_STRING);
     const channel: Channel = await connection.createChannel();
   
     const queueName: string = 'Qualified_Customers';
   
-    const queue = await channel.assertQueue(queueName, { durable: true });
-    
+    const queue: Replies.AssertQueue = await channel.assertQueue(queueName, { durable: true });
 
-    if(queue.messageCount === 0) {
-      console.log('You have no eligible customer in the queue, please add some.')
-      await channel.close()
-      await connection.close()
+    if (queue.messageCount === 0) {
+      console.log(`\nThere are currently no eligible guest on the queue !!!!!!!!!!!\n`);
+      await channel.close();
+      await connection.close();
       return
     }
-  
-    console.log(`Customers eligible for invitations are`);
-  
-    await channel.consume(queueName, (message: Message | null) => {
+    
+
+    console.log(`\n Eligible guests obtain from the queue are; \n \n`)
+    await channel.consume(queueName, (message: Message | null): void => {
       if (message !== null) {
+
         console.log(` ${message.content.toString()}`);
         channel.ack(message);
-        
       }
     })
     await channel.close();
@@ -39,4 +38,3 @@ catch (error: any) {
 }
 
 displayMessage();
-
